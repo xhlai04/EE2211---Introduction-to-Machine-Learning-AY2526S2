@@ -1,0 +1,89 @@
+import numpy as np
+from numpy.linalg import inv
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import PolynomialFeatures
+
+# Please replace "MatricNumber" with your actual matric number here and in the filename
+def A2_A0312315W(N):
+    """
+    Input type
+    :N type: int
+
+    Return type
+    :X_train type: numpy.ndarray of size (number_of_training_samples, 13)
+    :y_train type: numpy.ndarray of size (number_of_training_samples,)
+    :X_test type: numpy.ndarray of size (number_of_test_samples, 13)
+    :y_test type: numpy.ndarray of size (number_of_)test_samples,)
+    :Ytr type: numpy.ndarray of size (number_of_training_samples, 3)
+    :Yts type: numpy.ndarray of size (number_of_test_samples, 3)
+    :Ptrain_list type: List[numpy.ndarray]
+    :Ptest_list type: List[numpy.ndarray]
+    :w_list type: List[numpy.ndarray]
+    :error_train_array type: numpy.ndarray
+    :error_test_array type: numpy.ndarray
+    """
+    # your code goes here
+    wine_dataset = load_wine()
+    X_train, X_test, y_train, y_test = train_test_split(wine_dataset.data, wine_dataset.target, test_size=0.3, random_state=N)
+
+    one_hot_encoder = OneHotEncoder(sparse_output=False)
+    Ytr = one_hot_encoder.fit_transform(y_train.reshape(-1, 1))
+    Yts = one_hot_encoder.transform(y_test.reshape(-1, 1))
+
+    Ptrain_list = []
+    Ptest_list = []
+    for i in range(1, 10):
+        poly = PolynomialFeatures(degree=i)
+        Xtr_poly = poly.fit_transform(X_train)
+        Xts_poly = poly.transform(X_test)
+        Ptrain_list.append(Xtr_poly)
+        Ptest_list.append(Xts_poly)
+
+    lamb = 10  # Regularization term
+    w_list = []
+    for i in range(0, 9):
+        if Ptrain_list[i].shape[0] > Ptrain_list[i].shape[1]:  # m > d
+            w = inv((Ptrain_list[i].T @ Ptrain_list[i] + lamb * np.eye(Ptrain_list[i].shape[1]))) @ Ptrain_list[
+                i].T @ Ytr
+        else:  # m < d
+            w = Ptrain_list[i].T @ inv(Ptrain_list[i] @ Ptrain_list[i].T + lamb * np.eye(Ptrain_list[i].shape[0])) @ Ytr
+        w_list.append(w)
+
+    # Training predicted output
+    y_pred_list = []
+    for i in range(0, 9):
+        y_pred = Ptrain_list[i] @ w_list[i]
+        y_pred_cls = [[1 if y == max(x) else 0 for y in x] for x in y_pred]
+        y_pred_list.append(y_pred_cls)
+
+    # Training error
+    error_train_count = []
+    for i in range(0, 9):
+        m1 = np.array(Ytr)
+        m2 = np.array(y_pred_list[i])
+        diff = np.abs(m1 - m2)
+        error_count = len(np.where(diff.any(axis=1))[0])
+        error_train_count.append(error_count)
+
+    error_train_array = np.array(error_train_count)
+
+    # Testing error
+    yts_pred_list = []
+    for i in range(0, 9):
+        yts_pred = Ptest_list[i] @ w_list[i]
+        yts_pred_cls = [[1 if y == max(x) else 0 for y in x] for x in yts_pred]
+        yts_pred_list.append(yts_pred_cls)
+
+    error_test_count = []
+    for i in range(0, 9):
+        m1 = np.array(Yts)
+        m2 = np.array(yts_pred_list[i])
+        diff = np.abs(m1 - m2)
+        error_count = len(np.where(diff.any(axis=1))[0])
+        error_test_count.append(error_count)
+    error_test_array = np.array(error_test_count)
+
+    # return in this order
+    return X_train, y_train, X_test, y_test, Ytr, Yts, Ptrain_list, Ptest_list, w_list, error_train_array, error_test_array
